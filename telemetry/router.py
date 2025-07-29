@@ -31,12 +31,28 @@ def validateRequest(telemetry: TelemetryIn, db: Session):
     password = db.query(Vehicle.password).filter(Vehicle.vin).first()
     return (hash_password(telemetry.password) == password)
 
-def handle_telemetry(telemetry, db: Session):
-    check_speed_limis(telemetry, db)
-    check_fuel(telemetry, db)
+def handleDups(telemetry: TelemetryIn, db: Session):
+    db_tel: Telemetry = db.query(Telemetry.timestamp).filter(Telemetry.timestamp == telemetry.timestamp and Telemetry.vin == telemetry.vin).first()
+    if db_tel:
+        db_tel.latitude = telemetry.latitude
+        db_tel.longitude = telemetry.longitude
+        db_tel.speed = telemetry.speed
+        db_tel.engineStatus = telemetry.engineStatus
+        db_tel.fuel = telemetry.fuel
+        db_tel.odometerReading = telemetry.odometerReading
+        db_tel.diagnosticCode = telemetry.diagnosticCode
+        return True
+    return False
 
+def handle_telemetry(telemetry, db: Session):
     if not validateRequest(telemetry, db):
         raise HTTPException(status_code=401, detail="Wrong Password for Vehicle")
+    
+    if handleDups(telemetry, db):
+        return
+    
+    check_speed_limis(telemetry, db)
+    check_fuel(telemetry, db)
 
     db_telemetry = Telemetry(
         vin = telemetry.vin,
@@ -46,7 +62,8 @@ def handle_telemetry(telemetry, db: Session):
         engineStatus = telemetry.engineStatus,
         fuel = telemetry.fuel,
         odometerReading = telemetry.odometerReading,
-        diagnosticCode = telemetry.diagnosticCode
+        diagnosticCode = telemetry.diagnosticCode,
+        timestamp = telemetry.timestamp
     )
 
     fleet_id = db.query(Vehicle.fleetId).filter(Vehicle.vin == telemetry.vin).first()[0]

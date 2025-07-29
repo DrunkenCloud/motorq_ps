@@ -1,6 +1,7 @@
 import enum    
 from typing import List
 from pydantic import BaseModel
+from datetime import datetime
 
 class engineStatuses(str, enum.Enum):
     on = "on"
@@ -16,6 +17,8 @@ class TelemetryIn(BaseModel):
     fuel: float
     odometerReading: float
     diagnosticCode: int
+    password: str
+    timestamp: datetime
 
 class TelemetryInList(BaseModel):
     tel: List[TelemetryIn]
