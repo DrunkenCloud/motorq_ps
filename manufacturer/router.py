@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from ..database import SessionLocal
-from .models import Manufacturer
-from .schemas import ManufactererIn
+from .models import ManufactererIn
+from .schemas import Manufacturer
 
 router = APIRouter()
 

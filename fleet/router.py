@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from ..database import SessionLocal
-from .models import Fleet
-from .schemas import FleetIn
+from .models import FleetIn
+from .schemas import Fleet
 
 router = APIRouter()
 
