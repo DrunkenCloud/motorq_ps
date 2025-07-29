@@ -21,5 +21,26 @@ async def get_human(human_id: int):
     db = SessionLocal()
     db_human = db.query(Human).filter(Human.humanId == human_id).first()
     if not db_human:
-        raise HTTPException(status_code=404, detail="Fleet not found")
+        raise HTTPException(status_code=404, detail="Human not found")
     return db_human
+
+@router.put("/{human_id}")
+async def update_human(human_id: int, human: HumanIn):
+    db = SessionLocal()
+    db_human = db.query(Human).filter(Human.humanId == human_id).first()
+    if not db_human:
+        raise HTTPException(status_code=404, detail="Human not found")
+    db_human.humanName = human.name
+    db.commit()
+    db.refresh(db_human)
+    return db_human
+
+@router.delete("/{human_id}")
+async def delete_human(human_id: int):
+    db = SessionLocal()
+    db_human = db.query(Human).filter(Human.humanId == human_id).first()
+    if not db_human:
+        raise HTTPException(status_code=404, detail="Human not found")
+    db.delete(db_human)
+    db.commit()
+    return {"message": "Human deleted successfully"}

@@ -28,3 +28,25 @@ async def get_alert_type(alert_type_id: int):
     if not db_alertType:
         raise HTTPException(status_code=404, detail="Alert Type Not Found")
     return db_alertType
+
+@router.put("/alertTypes/{alert_type_id}")
+async def update_alert_type(alert_type_id: int, alertType: AlertTypeIn):
+    db = SessionLocal()
+    db_alertType = db.query(AlertType).filter(AlertType.alertTypeId == alert_type_id).first()
+    if not db_alertType:
+        raise HTTPException(status_code=404, detail="Alert Type Not Found")
+    db_alertType.alertTitle = alertType.alertTitle
+    db_alertType.alertDescription = alertType.alertDescription
+    db.commit()
+    db.refresh(db_alertType)
+    return db_alertType
+
+@router.delete("/alertTypes/{alert_type_id}")
+async def delete_alert_type(alert_type_id: int):
+    db = SessionLocal()
+    db_alertType = db.query(AlertType).filter(AlertType.alertTypeId == alert_type_id).first()
+    if not db_alertType:
+        raise HTTPException(status_code=404, detail="Alert Type Not Found")
+    db.delete(db_alertType)
+    db.commit()
+    return {"message": "Alert Type deleted successfully"}

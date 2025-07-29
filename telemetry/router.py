@@ -115,3 +115,42 @@ async def get_telemetry(telemetry_id: int):
         return db_telemetry
     finally:
         db.close()
+
+@router.put("/{telemetry_id}")
+async def update_telemetry(telemetry_id: int, telemetry: TelemetryIn):
+    db = SessionLocal()
+    try:
+        db_telemetry = db.query(Telemetry).filter(Telemetry.telemetryId == telemetry_id).first()
+        if not db_telemetry:
+            raise HTTPException(status_code=404, detail="Telemetry Not Found")
+        
+        handle_telemetry(telemetry, db)
+
+        db_telemetry.vin = telemetry.vin
+        db_telemetry.latitude = telemetry.latitude
+        db_telemetry.longitude = telemetry.longitude
+        db_telemetry.speed = telemetry.speed
+        db_telemetry.engineStatus = telemetry.engineStatus
+        db_telemetry.fuel = telemetry.fuel
+        db_telemetry.odometerReading = telemetry.odometerReading
+        db_telemetry.diagnosticCode = telemetry.diagnosticCode
+        db_telemetry.timestamp = telemetry.timestamp
+        
+        db.commit()
+        db.refresh(db_telemetry)
+        return db_telemetry
+    finally:
+        db.close()
+
+@router.delete("/{telemetry_id}")
+async def delete_telemetry(telemetry_id: int):
+    db = SessionLocal()
+    try:
+        db_telemetry = db.query(Telemetry).filter(Telemetry.telemetryId == telemetry_id).first()
+        if not db_telemetry:
+            raise HTTPException(status_code=404, detail="Telemetry Not Found")
+        db.delete(db_telemetry)
+        db.commit()
+        return {"message": "Telemetry deleted successfully"}
+    finally:
+        db.close()

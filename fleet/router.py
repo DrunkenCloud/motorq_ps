@@ -15,7 +15,7 @@ def get_db():
 @router.post("/")
 async def create_fleet(fleet: FleetIn):
     db = SessionLocal()
-    db_fleet = db.query(Fleet).filter(Fleet.manufactererId == fleet.manufacturerId and Fleet.fleetName == fleet.name).first()
+    db_fleet = db.query(Fleet).filter(Fleet.manufacturerId == fleet.manufacturerId and Fleet.fleetName == fleet.name).first()
     if db_fleet:
         raise HTTPException(status_code=409, detail="Fleet Already Exists")
     db_fleet = Fleet(
@@ -34,3 +34,25 @@ async def get_fleet(fleet_id: int):
     if not db_fleet:
         raise HTTPException(status_code=404, detail="Fleet not found")
     return db_fleet
+
+@router.put("/{fleet_id}")
+async def update_fleet(fleet_id: int, fleet: FleetIn):
+    db = SessionLocal()
+    db_fleet = db.query(Fleet).filter(Fleet.fleetId == fleet_id).first()
+    if not db_fleet:
+        raise HTTPException(status_code=404, detail="Fleet not found")
+    db_fleet.fleetName = fleet.name
+    db_fleet.manufacturerId = fleet.manufacturerId
+    db.commit()
+    db.refresh(db_fleet)
+    return db_fleet
+
+@router.delete("/{fleet_id}")
+async def delete_fleet(fleet_id: int):
+    db = SessionLocal()
+    db_fleet = db.query(Fleet).filter(Fleet.fleetId == fleet_id).first()
+    if not db_fleet:
+        raise HTTPException(status_code=404, detail="Fleet not found")
+    db.delete(db_fleet)
+    db.commit()
+    return {"message": "Fleet deleted successfully"}

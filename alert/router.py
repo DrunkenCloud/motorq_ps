@@ -30,3 +30,25 @@ async def get_alert(alert_id: int):
     if not db_alert:
         raise HTTPException(status_code=404, detail="Alert Not Found")
     return db_alert
+
+@router.put("/{alert_id}")
+async def update_alert(alert_id: int, alert: AlertIn):
+    db = SessionLocal()
+    db_alert = db.query(Alert).filter(Alert.alertId == alert_id).first()
+    if not db_alert:
+        raise HTTPException(status_code=404, detail="Alert Not Found")
+    db_alert.vin = alert.vin
+    db_alert.alertTypeId = alert.alertTypeId
+    db.commit()
+    db.refresh(db_alert)
+    return db_alert
+
+@router.delete("/{alert_id}")
+async def delete_alert(alert_id: int):
+    db = SessionLocal()
+    db_alert = db.query(Alert).filter(Alert.alertId == alert_id).first()
+    if not db_alert:
+        raise HTTPException(status_code=404, detail="Alert Not Found")
+    db.delete(db_alert)
+    db.commit()
+    return {"message": "Alert deleted successfully"}

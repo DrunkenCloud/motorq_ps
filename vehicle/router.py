@@ -51,5 +51,24 @@ async def delete_vehicle(vin: int):
         raise HTTPException(status_code=404, detail="Vehicle Not Found")
     db.delete(db_vehicle)
     db.commit()
-    return {"succes": True}
+    return {"success": True}
+
+@router.put("/{vin}")
+async def update_vehicle(vin: int, vehicle: VehicleIn):
+    db = SessionLocal()
+    db_vehicle = db.query(Vehicle).filter(Vehicle.vin == vin).first()
+    if not db_vehicle:
+        raise HTTPException(status_code=404, detail="Vehicle Not Found")
+    
+    db_vehicle.modelId = vehicle.modelId
+    db_vehicle.fleetId = vehicle.fleetId
+    db_vehicle.operatorId = vehicle.operatorId
+    db_vehicle.ownerId = vehicle.ownerId
+    db_vehicle.regStatus = vehicle.regStatus
+    if vehicle.password:
+        db_vehicle.password = hash_password(vehicle.password)
+    
+    db.commit()
+    db.refresh(db_vehicle)
+    return db_vehicle
 

@@ -34,3 +34,25 @@ async def get_model(model_id: int):
     if not db_model:
         raise HTTPException(status_code=404, detail="Model not found")
     return db_model
+
+@router.put("/{model_id}")
+async def update_model(model_id: int, model: ModelIn):
+    db = SessionLocal()
+    db_model = db.query(Model).filter(Model.modelId == model_id).first()
+    if not db_model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    db_model.modelName = model.name
+    db_model.manufactererId = model.manufacturerId
+    db.commit()
+    db.refresh(db_model)
+    return db_model
+
+@router.delete("/{model_id}")
+async def delete_model(model_id: int):
+    db = SessionLocal()
+    db_model = db.query(Model).filter(Model.modelId == model_id).first()
+    if not db_model:
+        raise HTTPException(status_code=404, detail="Model not found")
+    db.delete(db_model)
+    db.commit()
+    return {"message": "Model deleted successfully"}

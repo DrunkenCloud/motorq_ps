@@ -31,3 +31,24 @@ async def get_manufacturer(manufacturer_id: int):
     if not manufacturer:
         raise HTTPException(status_code=404, detail="Manufacturer not found")
     return manufacturer
+
+@router.put("/{manufacturer_id}")
+async def update_manufacturer(manufacturer_id: int, manufacturer: ManufactererIn):
+    db = SessionLocal()
+    db_manu = db.query(Manufacturer).filter(Manufacturer.manufacturerId == manufacturer_id).first()
+    if not db_manu:
+        raise HTTPException(status_code=404, detail="Manufacturer not found")
+    db_manu.manufacturerName = manufacturer.name
+    db.commit()
+    db.refresh(db_manu)
+    return db_manu
+
+@router.delete("/{manufacturer_id}")
+async def delete_manufacturer(manufacturer_id: int):
+    db = SessionLocal()
+    db_manu = db.query(Manufacturer).filter(Manufacturer.manufacturerId == manufacturer_id).first()
+    if not db_manu:
+        raise HTTPException(status_code=404, detail="Manufacturer not found")
+    db.delete(db_manu)
+    db.commit()
+    return {"message": "Manufacturer deleted successfully"}
