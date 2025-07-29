@@ -41,6 +41,10 @@ def handle_telemetry(telemetry, db: Session):
         odometerReading = telemetry.odometerReading,
         diagnosticCode = telemetry.diagnosticCode
     )
+
+    fleet_id = db.query(Vehicle).filter(Vehicle.vin == telemetry.vin).first()[0] + ""
+    redis_client.set("{fleet_id}avgFuel", -1)
+    redis_client.set("{fleet_id}distTot", -1)
     
     db.add(db_telemetry)
     db.commit()

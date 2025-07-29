@@ -14,6 +14,7 @@ from .vehicle.schemas import Vehicle
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from .database import Base, engine, SessionLocal
+from .database import redis_client
 
 Base.metadata.create_all(bind=engine)
 
@@ -39,6 +40,9 @@ async def get_all_active_inactive():
 
 @app.get("/avgFuelLevels/{fleet_id}")
 async def get_avg_fuel_levels(fleet_id: int):
+    cache = redis_client.get("{fleet_id}avgFuel")
+    if cache != -1:
+        return cache
     db = SessionLocal()
     total_fuel: float = 0
     count: int = 0
@@ -46,10 +50,14 @@ async def get_avg_fuel_levels(fleet_id: int):
         value = db.query(Telemetry.fuel).distinct().filter(Telemetry.vin == vin[0]).order_by(Telemetry.timestamp.desc()).first()
         total_fuel += value[0]
         count += 1
+    redis_client.set("{fleet_id}avgFuel", total_fuel/count)
     return {"avg": total_fuel/count}
 
 @app.get("/total_distance_traveled/{fleet_id}")
 async def get_total_distance_traveled(fleet_id: int):
+    cache = redis_client.get("{fleet_id}distTot")
+    if cache != -1:
+        return cache
     db: Session = SessionLocal()
     total_distance: float = 0.0
     time_24hrs_ago = datetime.utcnow() - timedelta(hours=24)
@@ -67,6 +75,7 @@ async def get_total_distance_traveled(fleet_id: int):
 
         if latest and before_24hr:
             total_distance += latest[0] - before_24hr[0]
+    redis_client.set("{fleet_id}distTot", total_distance, ex=86400)
 
     return {"total_distance": total_distance}
 
