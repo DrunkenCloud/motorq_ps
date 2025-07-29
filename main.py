@@ -7,6 +7,10 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.sql import func
 from .manufacturer.router import router as manufacturer_router
+from .model.router import router as model_router
+from .fleet.router import router as fleet_router
+from .human.router import router as human_router
+from .alert.schemas import Alert
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
@@ -22,23 +26,6 @@ class engineStatuses(str, enum.Enum):
     on = "on"
     off = "off"
     idle = "idle"
-
-class Model(Base):
-    __tablename__ = "models"
-    modelId = Column(Integer, primary_key=True, index=True, autoincrement="auto")
-    modelName = Column(String)
-    manufactererId = Column(Integer, ForeignKey("manufacturers.manufacturerId"))
-
-class Fleet(Base):
-    __tablename__ = "fleets"
-    fleetId = Column(Integer, primary_key=True, index=True, autoincrement="auto")
-    fleetName = Column(String)
-    manufactererId = Column(Integer, ForeignKey("manufacturers.manufacturerId"))
-
-class Human(Base):
-    __tablename__ = "humans"
-    humanId = Column(Integer, primary_key=True, index=True, autoincrement="auto")
-    humanName = Column(String)
 
 class Vehicle(Base):
     __tablename__ = "vehicles"
@@ -62,30 +49,6 @@ class Telemetry(Base):
     diagnosticCode = Column(Integer)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 
-class AlertType(Base):
-    __tablename__ = "alertTypes"
-    alertTypeId = Column(Integer, primary_key=True, index=True, autoincrement="auto")
-    alertTitle = Column(String)
-    alertDescription = Column(String)
-
-class Alert(Base):
-    __tablename__ = "alerts"
-    alertId = Column(Integer, primary_key=True, index=True, autoincrement="auto")
-    vin = Column(Integer, ForeignKey("vehicles.vin"))
-    alertTypeId = Column(Integer, ForeignKey("alertTypes.alertTypeId"))
-    timestamp = Column(DateTime(timezone=True), server_default=func.now())
-
-class HumanIn(BaseModel):
-    name: str
-
-class ModelIn(BaseModel):
-    name: str
-    manufacturerId: int
-
-class FleetIn(BaseModel):
-    name: str
-    manufacturerId: int
-
 class VehicleIn(BaseModel):
     vin: int
     modelId: int
@@ -93,15 +56,7 @@ class VehicleIn(BaseModel):
     operatorId: int
     ownerId: int
     regStatus: regStatuses
-
-class AlertTypeIn(BaseModel):
-    alertTitle: str
-    alertDescription: str
-
-class AlertIn(BaseModel):
-    vin: int
-    alertTypeId: int
-
+    
 class TelemetryIn(BaseModel):
     vin: int
     latitude: float
@@ -119,71 +74,9 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 app.include_router(manufacturer_router, prefix="/manufacturer")
-
-@app.post("/model")
-async def create_model(model: ModelIn):
-    db = SessionLocal()
-    db_model = db.query(Model).filter(Model.manufactererId == model.manufacturerId and Model.modelName == model.name).first()
-    if db_model:
-        raise HTTPException(status_code=409, detail="Model Already Exists")
-    db_model = Model(
-        modelName = model.name,
-        manufactererId = model.manufacturerId
-    )
-    db.add(db_model)
-    db.commit()
-    db.refresh(db_model)
-    return db_model
-
-@app.get("/model/{model_id}")
-async def get_model(model_id: int):
-    db = SessionLocal()
-    db_model = db.query(Model).filter(Model.modelId == model_id).first()
-    if not db_model:
-        raise HTTPException(status_code=404, detail="Model not found")
-    return db_model
-
-@app.post("/fleet")
-async def create_fleet(fleet: FleetIn):
-    db = SessionLocal()
-    db_fleet = db.query(Fleet).filter(Fleet.manufactererId == fleet.manufacturerId and Fleet.fleetName == fleet.name).first()
-    if db_fleet:
-        raise HTTPException(status_code=409, detail="Fleet Already Exists")
-    db_fleet = Fleet(
-        fleetName = fleet.name,
-        manufactererId = fleet.manufacturerId
-    )
-    db.add(db_fleet)
-    db.commit()
-    db.refresh(db_fleet)
-    return db_fleet
-
-@app.get("/fleet/{fleet_id}")
-async def get_fleet(fleet_id: int):
-    db = SessionLocal()
-    db_fleet = db.query(Fleet).filter(Fleet.fleetId == fleet_id).first()
-    if not db_fleet:
-        raise HTTPException(status_code=404, detail="Fleet not found")
-    return db_fleet
-
-@app.post("/human")
-async def create_human(human: HumanIn):
-    db = SessionLocal()
-    db_human = Human(
-        humanName = human.name
-    )
-    db.add(db_human)
-    db.commit()
-    db.refresh(db_human)
-    return db_human
-
-@app.get("/human/{human_id}")
-async def get_human(human_id: int):
-    db = SessionLocal()
-    db_human = db.query(Human).filter(Human.humanId == human_id).first()
-    if not db_human:
-        raise HTTPException(status_code=404, detail="Fleet not found")
-    return db_human
+app.include_router(model_router, prefix="/model")
+app.include_router(fleet_router, prefix="/fleet")
+app.include_router(human_router, prefix="/human")
 
 @app.post("/vehicle")
 async def create_vehicle(vehicle: VehicleIn):
@@ -231,56 +124,6 @@ async def delete_vehicle(vin: int):
     db.commit()
     return {"succes": True}
 
-@app.post("/alertTypes")
-async def create_alert_type(alertType: AlertTypeIn):
-    db = SessionLocal()
-    db_alertType = db.query(AlertType).filter(AlertType.alertTitle == alertType.alertTitle and AlertType.alertDescription == alertType.alertDescription).first()
-    if db_alertType:
-        raise HTTPException(status_code=409, detail="Alert Type Already Exists")
-    db_alertType = AlertType(
-        alertTitle = alertType.alertTitle,
-        alertDescription = alertType.alertDescription
-    )
-
-    db.add(db_alertType)
-    db.commit()
-    db.refresh(db_alertType)
-    return db_alertType
-
-@app.get("/alertTypes/{alert_type_id}")
-async def get_alert_type(alert_type_id: int):
-    db = SessionLocal()
-    db_alertType = db.query(AlertType).filter(AlertType.alertTypeId == alert_type_id).first()
-    if not db_alertType:
-        raise HTTPException(status_code=404, detail="Alert Type Not Found")
-    return db_alertType
-
-@app.post("/alert")
-async def create_alert(alert: AlertIn):
-    db = SessionLocal()
-    db_alert = Alert(
-        vin = alert.vin,
-        alertTypeId = alert.alertTypeId
-    )
-    db.add(db_alert)
-    db.commit()
-    db.refresh(db_alert)
-    return db_alert
-
-@app.get("/alerts")
-async def create_alert():
-    db = SessionLocal()
-    db_alerts = db.query(Alert).all()
-    return db_alerts
-
-@app.get("/alert/{alert_id}")
-async def get_alert(alert_id: int):
-    db = SessionLocal()
-    db_alert = db.query(Alert).filter(Alert.alertId == alert_id).first()
-    if not db_alert:
-        raise HTTPException(status_code=404, detail="Alert Not Found")
-    return db_alert
-
 def check_speed_limis(telemtry: TelemetryIn, db):
     if telemtry.speed > 120:
         db_alert = Alert(
@@ -319,13 +162,16 @@ def handle_telemetry(telemetry, db):
     db.refresh(db_telemetry)
 
 @app.post("/telemetry")
-async def create_telemetry(telemetry: Telemetry | TelemetryInList):
+async def create_telemetry(telemetry: TelemetryInList):
     db = SessionLocal()
-    if isinstance(telemetry, List):
-        for tel in telemetry:
-            handle_telemetry(tel, db)
-    else:
-        handle_telemetry(telemetry, db)
+    for tel in telemetry:
+        handle_telemetry(tel, db)
+    return {"success" : True }
+
+@app.post("/telemetry")
+async def create_telemetry(telemetry: TelemetryIn):
+    db = SessionLocal()
+    handle_telemetry(telemetry, db)
     return {"success" : True }
 
 @app.get("/telemetry/{telemetry_id}")
