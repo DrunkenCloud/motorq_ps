@@ -11,6 +11,8 @@ from .alert.schemas import Alert
 from .telemetry.models import engineStatuses
 from .telemetry.schemas import Telemetry
 from .vehicle.schemas import Vehicle
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 from .database import Base, engine, SessionLocal
 
 Base.metadata.create_all(bind=engine)
@@ -48,11 +50,24 @@ async def get_avg_fuel_levels(fleet_id: int):
 
 @app.get("/total_distance_traveled/{fleet_id}")
 async def get_total_distance_traveled(fleet_id: int):
-    db = SessionLocal()
-    total_distance: float = 0
-    for vin in db.query(Vehicle.vin).filter(Vehicle.fleetId == fleet_id).all():
-        value = db.query(Telemetry.odometerReading).distinct().filter(Telemetry.vin == vin[0]).order_by(Telemetry.timestamp.desc()).first()
-        total_distance += value[0]
+    db: Session = SessionLocal()
+    total_distance: float = 0.0
+    time_24hrs_ago = datetime.utcnow() - timedelta(hours=24)
+
+    vins = db.query(Vehicle.vin).filter(Vehicle.fleetId == fleet_id).all()
+    for (vin,) in vins:
+        latest = db.query(Telemetry.odometerReading).filter(
+            Telemetry.vin == vin
+        ).order_by(Telemetry.timestamp.desc()).first()
+
+        before_24hr = db.query(Telemetry.odometerReading).filter(
+            Telemetry.vin == vin,
+            Telemetry.timestamp <= time_24hrs_ago
+        ).order_by(Telemetry.timestamp.desc()).first()
+
+        if latest and before_24hr:
+            total_distance += latest[0] - before_24hr[0]
+
     return {"total_distance": total_distance}
 
 @app.get("/alertSummary")

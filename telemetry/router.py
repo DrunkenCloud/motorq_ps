@@ -3,6 +3,9 @@ from ..database import SessionLocal
 from .models import TelemetryIn, TelemetryInList
 from .schemas import Telemetry
 from ..alert.schemas import Alert
+from sqlalchemy.orm import Session
+from ..database import redis_client
+from ..vehicle.schemas import Vehicle
 
 router = APIRouter()
 
@@ -24,7 +27,7 @@ def check_fuel(telemtry: TelemetryIn, db):
         db.add(db_alert)
         db.commit()
 
-def handle_telemetry(telemetry, db):
+def handle_telemetry(telemetry, db: Session):
     check_speed_limis(telemetry, db)
     check_fuel(telemetry, db)
 
