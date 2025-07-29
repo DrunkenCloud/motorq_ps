@@ -3,7 +3,6 @@ from ..database import SessionLocal
 from .models import VehicleIn
 from .schemas import Vehicle
 from ..database import hash_password
-import bcrypt
 
 router = APIRouter()
 
