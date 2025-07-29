@@ -1,9 +1,6 @@
 from sqlalchemy import Column, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
-
-Base = declarative_base()
-
+from ..database import Base
 
 class AlertType(Base):
     __tablename__ = "alertTypes"

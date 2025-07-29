@@ -1,74 +1,19 @@
-import enum
-from typing import List
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import Column, Integer, String, create_engine, ForeignKey, Enum, Float, DateTime
-from sqlalchemy.ext.declarative import declarative_base
+from fastapi import FastAPI
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.sql import func
 from .manufacturer.router import router as manufacturer_router
 from .model.router import router as model_router
 from .fleet.router import router as fleet_router
 from .human.router import router as human_router
+from .alert.router import router as alert_router
+from .alert_type.router import router as alert_type_router
+from .vehicle.router import router as vehicle_router
+from .telemetry.router import router as telemetry_router
 from .alert.schemas import Alert
-
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-class regStatuses(str, enum.Enum):
-    active = "active"
-    maintenance = "maintenance"
-    decommisioned = "decommisioned"
-
-class engineStatuses(str, enum.Enum):
-    on = "on"
-    off = "off"
-    idle = "idle"
-
-class Vehicle(Base):
-    __tablename__ = "vehicles"
-    vin = Column(Integer, primary_key=True, index=True, autoincrement="auto")
-    modelId = Column(Integer, index=True)
-    fleetId = Column(Integer, ForeignKey("fleets.fleetId"))
-    operatorId = Column(Integer, ForeignKey("humans.humanId"))
-    ownerId = Column(Integer, ForeignKey("humans.humanId"))
-    regStatus = Column(Enum(regStatuses))
-
-class Telemetry(Base):
-    __tablename__ = "telemetries"
-    telemetryId = Column(Integer, primary_key=True, index=True, autoincrement="auto")
-    vin = Column(Integer, ForeignKey("vehicles.vin"))
-    latitude = Column(Float)
-    longitude = Column(Float)
-    speed = Column(Float)
-    odometerReading = Column(Integer)
-    fuel = Column(Float)
-    engineStatus = Column(Enum(engineStatuses))
-    diagnosticCode = Column(Integer)
-    timestamp = Column(DateTime(timezone=True), server_default=func.now())
-
-class VehicleIn(BaseModel):
-    vin: int
-    modelId: int
-    fleetId: int
-    operatorId: int
-    ownerId: int
-    regStatus: regStatuses
-    
-class TelemetryIn(BaseModel):
-    vin: int
-    latitude: float
-    longitude: float
-    speed: float
-    engineStatus: engineStatuses
-    fuel: float
-    odometerReading: float
-    diagnosticCode: int
-
-class TelemetryInList(BaseModel):
-    tel: List[TelemetryIn]
+from .telemetry.models import engineStatuses
+from .telemetry.schemas import Telemetry
+from .vehicle.schemas import Vehicle
+from .database import Base, engine, SessionLocal
 
 Base.metadata.create_all(bind=engine)
 
@@ -77,116 +22,10 @@ app.include_router(manufacturer_router, prefix="/manufacturer")
 app.include_router(model_router, prefix="/model")
 app.include_router(fleet_router, prefix="/fleet")
 app.include_router(human_router, prefix="/human")
-
-@app.post("/vehicle")
-async def create_vehicle(vehicle: VehicleIn):
-    db = SessionLocal()
-
-    db_vehicle = db.query(Vehicle).filter(Vehicle.vin == vehicle.vin).first()
-    if db_vehicle:
-        raise HTTPException(status_code=409, detail="Vehicle Already Exists")
-
-    db_vehicle = Vehicle(
-        vin = vehicle.vin,
-        modelId = vehicle.modelId,
-        fleetId = vehicle.fleetId,
-        operatorId = vehicle.operatorId,
-        ownerId = vehicle.ownerId,
-        regStatus = vehicle.regStatus,
-    )
-
-    db.add(db_vehicle)
-    db.commit()
-    db.refresh(db_vehicle)
-    return db_vehicle
-
-@app.get("/vehicle/{vin}")
-async def get_vehicle(vin: int):
-    db = SessionLocal()
-    db_vehicle = db.query(Vehicle).filter(Vehicle.vin == vin).first()
-    if not db_vehicle:
-        raise HTTPException(status_code=404, detail="Vehicle Not Found")
-    return db_vehicle
-
-@app.get("/vehicles")
-async def get_vehicles():
-    db = SessionLocal()
-    db_vehicles = db.query(Vehicle).all()
-    return db_vehicles
-
-@app.delete("/vehicle/{vin}")
-async def delete_vehicle(vin: int):
-    db = SessionLocal()
-    db_vehicle = db.query(Vehicle).filter(Vehicle.vin == vin).first()
-    if not db_vehicle:
-        raise HTTPException(status_code=404, detail="Vehicle Not Found")
-    db.delete(db_vehicle)
-    db.commit()
-    return {"succes": True}
-
-def check_speed_limis(telemtry: TelemetryIn, db):
-    if telemtry.speed > 120:
-        db_alert = Alert(
-            vin = telemtry.vin,
-            alertTypeId = 1
-        )
-        db.add(db_alert)
-        db.commit()
-
-def check_fuel(telemtry: TelemetryIn, db):
-    if telemtry.fuel < 0.15:
-        db_alert = Alert(
-            vin = telemtry.vin,
-            alertTypeId = 2
-        )
-        db.add(db_alert)
-        db.commit()
-
-def handle_telemetry(telemetry, db):
-    check_speed_limis(telemetry, db)
-    check_fuel(telemetry, db)
-
-    db_telemetry = Telemetry(
-        vin = telemetry.vin,
-        latitude = telemetry.latitude,
-        longitude = telemetry.longitude,
-        speed = telemetry.speed,
-        engineStatus = telemetry.engineStatus,
-        fuel = telemetry.fuel,
-        odometerReading = telemetry.odometerReading,
-        diagnosticCode = telemetry.diagnosticCode
-    )
-    
-    db.add(db_telemetry)
-    db.commit()
-    db.refresh(db_telemetry)
-
-@app.post("/telemetry")
-async def create_telemetry(telemetry: TelemetryInList):
-    db = SessionLocal()
-    for tel in telemetry:
-        handle_telemetry(tel, db)
-    return {"success" : True }
-
-@app.post("/telemetry")
-async def create_telemetry(telemetry: TelemetryIn):
-    db = SessionLocal()
-    handle_telemetry(telemetry, db)
-    return {"success" : True }
-
-@app.get("/telemetry/{telemetry_id}")
-async def get_telemetry(telemetry_id: int):
-    db = SessionLocal()
-    db_telemetry = db.query(Telemetry).filter(Telemetry.telemetryId == telemetry_id).first()
-    if not db_telemetry:
-        raise HTTPException(status_code=404, detail="Telemetry Not Found")
-    return db_telemetry
-
-@app.get("/telemetries")
-async def get_telemetry():
-    db = SessionLocal()
-    db_telemetry = db.query(Telemetry).all()
-    return db_telemetry
+app.include_router(vehicle_router, prefix="/vehicle")
+app.include_router(alert_type_router, prefix="/alert_type")
+app.include_router(alert_router, prefix="/alert")
+app.include_router(telemetry_router, prefix="/telemetry")
 
 @app.get("/allActiveAndInactive")
 async def get_all_active_inactive():
