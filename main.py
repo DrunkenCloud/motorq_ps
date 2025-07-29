@@ -1,6 +1,4 @@
 from fastapi import FastAPI
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from .manufacturer.router import router as manufacturer_router
 from .model.router import router as model_router
 from .fleet.router import router as fleet_router
@@ -30,8 +28,8 @@ app.include_router(telemetry_router, prefix="/telemetry")
 @app.get("/allActiveAndInactive")
 async def get_all_active_inactive():
     db = SessionLocal()
-    active = len(db.query(Telemetry.vin).distinct().filter(Telemetry.engineStatus == engineStatuses.on).all())
-    total = len(db.query(Telemetry.vin).distinct().all())
+    active = db.query(Telemetry.vin).distinct().filter(Telemetry.engineStatus == engineStatuses.on).count()
+    total = db.query(Telemetry.vin).distinct().count()
     return {
         "active" : active,
         "inactive": total-active

@@ -42,30 +42,45 @@ def handle_telemetry(telemetry, db):
     db.add(db_telemetry)
     db.commit()
     db.refresh(db_telemetry)
-
+    
 @router.post("/batch")
 async def create_telemetry(telemetry: TelemetryInList):
     db = SessionLocal()
-    for tel in telemetry:
-        handle_telemetry(tel, db)
-    return {"success" : True }
+    try:
+        processed_vins = set()
+        for tel in telemetry:
+            handle_telemetry(tel, db)
+            processed_vins.add(tel.vin)
+        
+        return {"success": True}
+    finally:
+        db.close()
 
 @router.post("/")
 async def create_telemetry(telemetry: TelemetryIn):
     db = SessionLocal()
-    handle_telemetry(telemetry, db)
-    return {"success" : True }
+    try:
+        handle_telemetry(telemetry, db)
+        return {"success": True}
+    finally:
+        db.close()
 
 @router.get("/all")
 async def get_telemetry():
     db = SessionLocal()
-    db_telemetry = db.query(Telemetry).all()
-    return db_telemetry
+    try:
+        db_telemetry = db.query(Telemetry).all()
+        return db_telemetry
+    finally:
+        db.close()
 
 @router.get("/{telemetry_id}")
 async def get_telemetry(telemetry_id: int):
     db = SessionLocal()
-    db_telemetry = db.query(Telemetry).filter(Telemetry.telemetryId == telemetry_id).first()
-    if not db_telemetry:
-        raise HTTPException(status_code=404, detail="Telemetry Not Found")
-    return db_telemetry
+    try:
+        db_telemetry = db.query(Telemetry).filter(Telemetry.telemetryId == telemetry_id).first()
+        if not db_telemetry:
+            raise HTTPException(status_code=404, detail="Telemetry Not Found")
+        return db_telemetry
+    finally:
+        db.close()
