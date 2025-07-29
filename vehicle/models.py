@@ -1,7 +1,7 @@
-import enum
+from enum import Enum
 from pydantic import BaseModel
 
-class regStatuses(str, enum.Enum):
+class regStatuses(str, Enum):
     active = "active"
     maintenance = "maintenance"
     decommisioned = "decommisioned"

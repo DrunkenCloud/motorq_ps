@@ -12,7 +12,6 @@ def get_db():
     finally:
         db.close()
 
-
 @router.post("/")
 async def create_manufacturer(manufacturer: ManufactererIn):
     db = SessionLocal()

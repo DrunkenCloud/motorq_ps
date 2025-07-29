@@ -1,9 +1,9 @@
-import enum    
+from enum import Enum    
 from typing import List
 from pydantic import BaseModel
 from datetime import datetime
 
-class engineStatuses(str, enum.Enum):
+class engineStatuses(str, Enum):
     on = "on"
     off = "off"
     idle = "idle"

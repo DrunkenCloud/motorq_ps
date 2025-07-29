@@ -11,9 +11,14 @@ from .alert.schemas import Alert
 from .telemetry.models import engineStatuses
 from .telemetry.schemas import Telemetry
 from .vehicle.schemas import Vehicle
+from .manufacturer.schemas import Manufacturer
+from .model.schemas import Model
+from .fleet.schemas import Fleet
+from .human.schemas import Human
+from .alert_type.schemas import AlertType
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from .database import Base, engine, SessionLocal
+from .database import Base, engine, SessionLocal, hash_password
 from .database import redis_client
 
 Base.metadata.create_all(bind=engine)
@@ -91,3 +96,74 @@ async def get_alert_summary():
             summary[alert.alertTypeId] += 1
         
     return summary
+
+@app.post("/seed")
+async def seed_data():
+    db = SessionLocal()
+    # Create Manufacturers
+    manufacturers = [
+        Manufacturer(name="Toyota"),
+        Manufacturer(name="Ford"),
+        Manufacturer(name="Honda"),
+    ]
+    db.add_all(manufacturers)
+    db.commit()
+
+    # Create Models
+    models = [
+        Model(name="Camry", manufacturerId=1),
+        Model(name="F-150", manufacturerId=2),
+        Model(name="Civic", manufacturerId=3),
+    ]
+    db.add_all(models)
+    db.commit()
+
+    # Create Fleets
+    fleets = [
+        Fleet(name="West Coast Fleet", manufacturerId=1),
+        Fleet(name="East Coast Fleet", manufacturerId=2),
+    ]
+    db.add_all(fleets)
+    db.commit()
+
+    # Create Humans
+    humans = [
+        Human(name="John Doe"),
+        Human(name="Jane Smith"),
+    ]
+    db.add_all(humans)
+    db.commit()
+
+    # Create AlertTypes
+    alert_types = [
+        AlertType(alertTitle="Low Fuel", alertDescription="Fuel level is critically low."),
+        AlertType(alertTitle="Engine Overheating", alertDescription="Engine temperature is too high."),
+    ]
+    db.add_all(alert_types)
+    db.commit()
+
+    # Create Vehicles
+    vehicles = [
+        Vehicle(vin=12345, modelId=1, fleetId=1, operatorId=1, ownerId=2, regStatus="active", password=hash_password("password123")),
+        Vehicle(vin=67890, modelId=2, fleetId=2, operatorId=2, ownerId=1, regStatus="maintenance", password=hash_password("password456")),
+    ]
+    db.add_all(vehicles)
+    db.commit()
+
+    # Create Telemetry
+    telemetry_data = [
+        Telemetry(vin=12345, latitude=34.0522, longitude=-118.2437, speed=65, engineStatus="on", fuel=0.25, odometerReading=50000, diagnosticCode=101, password=hash_password("password123"), timestamp=datetime.utcnow()),
+        Telemetry(vin=67890, latitude=40.7128, longitude=-74.0060, speed=0, engineStatus="off", fuel=0.75, odometerReading=120000, diagnosticCode=0, password=hash_password("password456"), timestamp=datetime.utcnow()),
+    ]
+    db.add_all(telemetry_data)
+    db.commit()
+
+    # Create Alerts
+    alerts = [
+        Alert(vin=12345, alertTypeId=1),
+        Alert(vin=67890, alertTypeId=2),
+    ]
+    db.add_all(alerts)
+    db.commit()
+
+    return {"message": "Database seeded successfully."}
