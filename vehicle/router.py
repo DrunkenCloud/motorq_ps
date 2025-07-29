@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException
 from ..database import SessionLocal
 from .models import VehicleIn
 from .schemas import Vehicle
+from ..database import hash_password
+import bcrypt
 
 router = APIRouter()
 
@@ -20,6 +22,7 @@ async def create_vehicle(vehicle: VehicleIn):
         operatorId = vehicle.operatorId,
         ownerId = vehicle.ownerId,
         regStatus = vehicle.regStatus,
+        password = hash_password(vehicle.password)
     )
 
     db.add(db_vehicle)

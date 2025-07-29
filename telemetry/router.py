@@ -4,7 +4,7 @@ from .models import TelemetryIn, TelemetryInList
 from .schemas import Telemetry
 from ..alert.schemas import Alert
 from sqlalchemy.orm import Session
-from ..database import redis_client
+from ..database import redis_client, hash_password
 from ..vehicle.schemas import Vehicle
 
 router = APIRouter()
@@ -26,10 +26,17 @@ def check_fuel(telemtry: TelemetryIn, db):
         )
         db.add(db_alert)
         db.commit()
+    
+def validateRequest(telemetry: TelemetryIn, db: Session):
+    password = db.query(Vehicle.password).filter(Vehicle.vin).first()
+    return (hash_password(telemetry.password) == password)
 
 def handle_telemetry(telemetry, db: Session):
     check_speed_limis(telemetry, db)
     check_fuel(telemetry, db)
+
+    if not validateRequest(telemetry, db):
+        raise HTTPException(status_code=401, detail="Wrong Password for Vehicle")
 
     db_telemetry = Telemetry(
         vin = telemetry.vin,
@@ -42,9 +49,9 @@ def handle_telemetry(telemetry, db: Session):
         diagnosticCode = telemetry.diagnosticCode
     )
 
-    fleet_id = db.query(Vehicle).filter(Vehicle.vin == telemetry.vin).first()[0] + ""
-    redis_client.set("{fleet_id}avgFuel", -1)
-    redis_client.set("{fleet_id}distTot", -1)
+    fleet_id = db.query(Vehicle.fleetId).filter(Vehicle.vin == telemetry.vin).first()[0]
+    redis_client.set(f"{fleet_id}avgFuel", -1)
+    redis_client.set(f"{fleet_id}distTot", -1)
     
     db.add(db_telemetry)
     db.commit()

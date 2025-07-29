@@ -13,3 +13,4 @@ class VehicleIn(BaseModel):
     operatorId: int
     ownerId: int
     regStatus: regStatuses
+    password: str

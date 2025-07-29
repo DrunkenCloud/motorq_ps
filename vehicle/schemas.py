@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, Enum
+from sqlalchemy import Column, Integer, ForeignKey, Enum, String
 from .models import regStatuses
 from ..database import Base
 
@@ -10,3 +10,4 @@ class Vehicle(Base):
     operatorId = Column(Integer, ForeignKey("humans.humanId"))
     ownerId = Column(Integer, ForeignKey("humans.humanId"))
     regStatus = Column(Enum(regStatuses))
+    password = Column(String)
