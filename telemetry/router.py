@@ -4,8 +4,21 @@ from .models import TelemetryIn, TelemetryInList
 from .schemas import Telemetry
 from ..alert.schemas import Alert
 from sqlalchemy.orm import Session
-from ..database import redis_client, hash_password
+from ..database import redis_client, verify_password
 from ..vehicle.schemas import Vehicle
+
+def is_rate_limited(vin: str) -> bool:
+    key = f"rate_limit:{vin}"
+    current = redis_client.get(key)
+
+    if current is None:
+        redis_client.set(key, 1, ex=60)
+        return False
+    elif int(current) >= 4:
+        return True
+    else:
+        redis_client.incr(key)
+        return False
 
 router = APIRouter()
 
@@ -28,28 +41,15 @@ def check_fuel(telemtry: TelemetryIn, db):
         db.commit()
     
 def validateRequest(telemetry: TelemetryIn, db: Session):
-    password = db.query(Vehicle.password).filter(Vehicle.vin).first()
-    return (hash_password(telemetry.password) == password)
-
-def handleDups(telemetry: TelemetryIn, db: Session):
-    db_tel: Telemetry = db.query(Telemetry.timestamp).filter(Telemetry.timestamp == telemetry.timestamp and Telemetry.vin == telemetry.vin).first()
-    if db_tel:
-        db_tel.latitude = telemetry.latitude
-        db_tel.longitude = telemetry.longitude
-        db_tel.speed = telemetry.speed
-        db_tel.engineStatus = telemetry.engineStatus
-        db_tel.fuel = telemetry.fuel
-        db_tel.odometerReading = telemetry.odometerReading
-        db_tel.diagnosticCode = telemetry.diagnosticCode
-        return True
-    return False
+    password = db.query(Vehicle.password).filter(Vehicle.vin).first()[0]
+    return verify_password(telemetry.password,password)
 
 def handle_telemetry(telemetry, db: Session):
     if not validateRequest(telemetry, db):
         raise HTTPException(status_code=401, detail="Wrong Password for Vehicle")
     
-    if handleDups(telemetry, db):
-        return
+    if is_rate_limited(telemetry.vin):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded: Max 2 requests per minute.")
     
     check_speed_limis(telemetry, db)
     check_fuel(telemetry, db)

@@ -14,3 +14,11 @@ class VehicleIn(BaseModel):
     ownerId: int
     regStatus: regStatuses
     password: str
+
+class VehicleOut(BaseModel):
+    vin: int
+    modelId: int
+    fleetId: int
+    operatorId: int
+    ownerId: int
+    regStatus: regStatuses

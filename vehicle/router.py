@@ -1,13 +1,13 @@
 from fastapi import APIRouter, HTTPException
 from ..database import SessionLocal
-from .models import VehicleIn
+from .models import VehicleIn, VehicleOut
 from .schemas import Vehicle
 from ..database import hash_password
 
 router = APIRouter()
 
 @router.post("/")
-async def create_vehicle(vehicle: VehicleIn):
+async def create_vehicle(vehicle: VehicleIn) -> VehicleOut:
     db = SessionLocal()
 
     db_vehicle = db.query(Vehicle).filter(Vehicle.vin == vehicle.vin).first()

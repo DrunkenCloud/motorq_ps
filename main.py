@@ -60,29 +60,57 @@ async def get_avg_fuel_levels(fleet_id: int):
 
 @app.get("/total_distance_traveled/{fleet_id}")
 async def get_total_distance_traveled(fleet_id: int):
-    cache = redis_client.get("{fleet_id}distTot")
-    if cache != -1:
-        return cache
+    cache = redis_client.get(f"{fleet_id}distTot")
+    if cache is not None:
+        try:
+            return {"total_distance": float(cache)}
+        except ValueError:
+            pass
+
     db: Session = SessionLocal()
-    total_distance: float = 0.0
-    time_24hrs_ago = datetime.utcnow() - timedelta(hours=24)
 
     vins = db.query(Vehicle.vin).filter(Vehicle.fleetId == fleet_id).all()
-    for (vin,) in vins:
-        latest = db.query(Telemetry.odometerReading).filter(
-            Telemetry.vin == vin
-        ).order_by(Telemetry.timestamp.desc()).first()
+    vins = [vin for (vin,) in vins]
 
-        before_24hr = db.query(Telemetry.odometerReading).filter(
-            Telemetry.vin == vin,
-            Telemetry.timestamp <= time_24hrs_ago
-        ).order_by(Telemetry.timestamp.desc()).first()
+    latest_timestamp = (
+        db.query(Telemetry.timestamp)
+        .filter(Telemetry.vin.in_(vins))
+        .order_by(Telemetry.timestamp.desc())
+        .first()
+    )
+
+    if not latest_timestamp:
+        return {"total_distance": 0.0}
+
+    latest_timestamp = latest_timestamp[0]
+    cutoff_time = latest_timestamp - timedelta(hours=24)
+
+    total_distance = 0.0
+
+    for vin in vins:
+        latest = (
+            db.query(Telemetry.odometerReading)
+            .filter(Telemetry.vin == vin)
+            .order_by(Telemetry.timestamp.desc())
+            .first()
+        )
+
+        before_24hr = (
+            db.query(Telemetry.odometerReading)
+            .filter(
+                Telemetry.vin == vin,
+                Telemetry.timestamp <= cutoff_time
+            )
+            .order_by(Telemetry.timestamp.desc())
+            .first()
+        )
 
         if latest and before_24hr:
             total_distance += latest[0] - before_24hr[0]
-    redis_client.set("{fleet_id}distTot", total_distance, ex=86400)
 
+    redis_client.set(f"{fleet_id}distTot", total_distance, ex=86400)
     return {"total_distance": total_distance}
+
 
 @app.get("/alertSummary")
 async def get_alert_summary():
@@ -144,16 +172,16 @@ async def seed_data():
 
     # Create Vehicles
     vehicles = [
-        Vehicle(vin=12345, modelId=1, fleetId=1, operatorId=1, ownerId=2, regStatus="active", password=hash_password("password123")),
-        Vehicle(vin=67890, modelId=2, fleetId=2, operatorId=2, ownerId=1, regStatus="maintenance", password=hash_password("password456")),
+        Vehicle(vin=12345, modelId=1, fleetId=1, operatorId=1, ownerId=2, regStatus="active", password="password123"),
+        Vehicle(vin=67890, modelId=2, fleetId=2, operatorId=2, ownerId=1, regStatus="maintenance", password="password456"),
     ]
     db.add_all(vehicles)
     db.commit()
 
     # Create Telemetry
     telemetry_data = [
-        Telemetry(vin=12345, latitude=34.0522, longitude=-118.2437, speed=65, engineStatus="on", fuel=0.25, odometerReading=50000, diagnosticCode=101, password=hash_password("password123"), timestamp=datetime.utcnow()),
-        Telemetry(vin=67890, latitude=40.7128, longitude=-74.0060, speed=0, engineStatus="off", fuel=0.75, odometerReading=120000, diagnosticCode=0, password=hash_password("password456"), timestamp=datetime.utcnow()),
+        Telemetry(vin=12345, latitude=34.0522, longitude=-118.2437, speed=65, engineStatus="on", fuel=0.25, odometerReading=50000, diagnosticCode=100, timestamp=datetime.utcnow()),
+        Telemetry(vin=67890, latitude=40.7128, longitude=-74.0060, speed=0, engineStatus="off", fuel=0.75, odometerReading=120000, diagnosticCode=0, timestamp=datetime.utcnow()),
     ]
     db.add_all(telemetry_data)
     db.commit()
